@@ -120,6 +120,11 @@ function readRemoteAddressFromSource(source: unknown): string | undefined {
   return normalizeIpAddress(candidate.socket?.remoteAddress ?? candidate.remoteAddress);
 }
 
+export function isRequestFromLoopback(request: HttpServerRequest.HttpServerRequest): boolean {
+  const address = readRemoteAddressFromSource(request.source);
+  return address === "127.0.0.1" || address === "::1";
+}
+
 export function deriveAuthClientMetadata(input: {
   readonly request: HttpServerRequest.HttpServerRequest;
   readonly presented?: AuthClientPresentationMetadata;

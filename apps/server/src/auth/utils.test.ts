@@ -1,6 +1,34 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { deriveAuthClientMetadata } from "./utils.ts";
+import { deriveAuthClientMetadata, isRequestFromLoopback } from "./utils.ts";
+
+describe("isRequestFromLoopback", () => {
+  it.each(["127.0.0.1", "::1", "::ffff:127.0.0.1"])(
+    "allows host application access from %s",
+    (remoteAddress) => {
+      expect(
+        isRequestFromLoopback({
+          source: { remoteAddress },
+        } as never),
+      ).toBe(true);
+    },
+  );
+
+  it.each(["192.168.213.72", "10.0.0.5"])(
+    "denies host application access from %s",
+    (remoteAddress) => {
+      expect(
+        isRequestFromLoopback({
+          source: { remoteAddress },
+        } as never),
+      ).toBe(false);
+    },
+  );
+
+  it("fails closed when the transport address is unavailable", () => {
+    expect(isRequestFromLoopback({ source: undefined } as never)).toBe(false);
+  });
+});
 
 describe("deriveAuthClientMetadata", () => {
   it("labels Electron user agents as Electron instead of Chrome", () => {
