@@ -39,11 +39,13 @@ const SESSION_EXPIRES_AT = DateTime.makeUnsafe("2026-04-05T00:00:00.000Z");
 const unauthenticatedSession = (auth: AuthSessionState["auth"]): AuthSessionState => ({
   authenticated: false,
   auth,
+  canOpenHostApplications: true,
 });
 
 const authenticatedSession = (auth: AuthSessionState["auth"]): AuthSessionState => ({
   authenticated: true,
   auth,
+  canOpenHostApplications: true,
   sessionMethod: "browser-session-cookie",
   expiresAt: SESSION_EXPIRES_AT,
 });

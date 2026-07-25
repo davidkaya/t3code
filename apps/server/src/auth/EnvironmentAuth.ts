@@ -33,6 +33,7 @@ import * as PairingGrantStore from "./PairingGrantStore.ts";
 import * as ServerSecretStore from "./ServerSecretStore.ts";
 import * as SessionStore from "./SessionStore.ts";
 import { verifyRequestDpopProof } from "./dpop.ts";
+import { isRequestFromLoopback } from "./utils.ts";
 import { layerConfig as SqlitePersistenceLayer } from "../persistence/Layers/Sqlite.ts";
 
 export const DEFAULT_SESSION_SUBJECT = "cli-issued-session";
@@ -637,6 +638,7 @@ export const make = Effect.gen(function* () {
           ({
             authenticated: true,
             auth: descriptor,
+            canOpenHostApplications: isRequestFromLoopback(request),
             scopes: session.scopes,
             sessionMethod: session.method,
             ...(session.expiresAt ? { expiresAt: DateTime.toUtc(session.expiresAt) } : {}),
@@ -646,6 +648,7 @@ export const make = Effect.gen(function* () {
         Effect.succeed({
           authenticated: false,
           auth: descriptor,
+          canOpenHostApplications: isRequestFromLoopback(request),
         } satisfies AuthSessionState),
       ),
       Effect.withSpan("EnvironmentAuth.getSessionState"),

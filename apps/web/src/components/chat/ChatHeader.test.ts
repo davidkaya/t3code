@@ -12,6 +12,7 @@ describe("shouldShowOpenInPicker", () => {
         activeProjectName: "codething-mvp",
         activeThreadEnvironmentId: primaryEnvironmentId,
         primaryEnvironmentId,
+        canOpenHostApplications: true,
       }),
     ).toBe(true);
   });
@@ -22,6 +23,7 @@ describe("shouldShowOpenInPicker", () => {
         activeProjectName: "codething-mvp",
         activeThreadEnvironmentId: EnvironmentId.make("environment-remote"),
         primaryEnvironmentId: null,
+        canOpenHostApplications: false,
       }),
     ).toBe(false);
   });
@@ -32,6 +34,7 @@ describe("shouldShowOpenInPicker", () => {
         activeProjectName: "codething-mvp",
         activeThreadEnvironmentId: EnvironmentId.make("environment-remote"),
         primaryEnvironmentId,
+        canOpenHostApplications: true,
       }),
     ).toBe(false);
   });
@@ -42,6 +45,18 @@ describe("shouldShowOpenInPicker", () => {
         activeProjectName: undefined,
         activeThreadEnvironmentId: primaryEnvironmentId,
         primaryEnvironmentId,
+        canOpenHostApplications: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("hides the picker for a remote client connected to the primary environment", () => {
+    expect(
+      shouldShowOpenInPicker({
+        activeProjectName: "codething-mvp",
+        activeThreadEnvironmentId: primaryEnvironmentId,
+        primaryEnvironmentId,
+        canOpenHostApplications: false,
       }),
     ).toBe(false);
   });

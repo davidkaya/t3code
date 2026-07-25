@@ -35,3 +35,7 @@ export function usePrimarySessionState() {
     refresh,
   };
 }
+
+export function useCanOpenHostApplications(): boolean {
+  return usePrimarySessionState().data?.canOpenHostApplications ?? false;
+}

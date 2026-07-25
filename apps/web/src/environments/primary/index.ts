@@ -36,7 +36,11 @@ export {
   __resetServerAuthBootstrapForTests,
 } from "./auth";
 
-export { refreshPrimarySessionState, usePrimarySessionState } from "./sessionState";
+export {
+  refreshPrimarySessionState,
+  useCanOpenHostApplications,
+  usePrimarySessionState,
+} from "./sessionState";
 
 export { PrimaryEnvironmentHttpClient } from "./httpClient";
 
