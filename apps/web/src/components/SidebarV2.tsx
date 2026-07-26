@@ -2232,7 +2232,7 @@ export default function SidebarV2() {
                 <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground/80" />
                 <div className="flex-1 truncate text-left">Search</div>
                 {commandPaletteShortcutLabel ? (
-                  <Kbd className="h-4 min-w-0 rounded-sm bg-sidebar-control-surface px-1.5 text-[10px] text-sidebar-muted-foreground ring-1 ring-sidebar-border">
+                  <Kbd className="h-4 min-w-0 rounded-sm bg-sidebar-control-surface px-1.5 text-[10px] text-sidebar-muted-foreground ring-1 ring-sidebar-border pointer-coarse:hidden">
                     {commandPaletteShortcutLabel}
                   </Kbd>
                 ) : null}
