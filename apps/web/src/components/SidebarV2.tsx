@@ -773,7 +773,7 @@ const SidebarV2Row = memo(function SidebarV2Row(props: {
               the time/jump label yields to the settle affordance. */}
             {prBadge}
             <span className="relative ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end">
-              <span className="inline-flex justify-end tabular-nums text-muted-foreground/55 transition-opacity group-hover/v2-row:opacity-0">
+              <span className="inline-flex justify-end tabular-nums text-muted-foreground/55 transition-opacity group-hover/v2-row:opacity-0 [@media(hover:none)]:opacity-0">
                 {variantAction === "unsnooze" && props.snoozeWakeLabelText !== null ? (
                   // Snoozed rows show when they come BACK, not when they were
                   // last touched — the return ticket is the row's whole story.
@@ -805,7 +805,7 @@ const SidebarV2Row = memo(function SidebarV2Row(props: {
                     type="button"
                     aria-label="Wake thread now"
                     onClick={handleUnsnoozeClick}
-                    className="absolute inset-y-0 right-0 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-2 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/v2-row:opacity-100"
+                    className="absolute inset-y-0 right-0 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-2 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/v2-row:opacity-100 [@media(hover:none)]:opacity-100"
                   >
                     <AlarmClockOffIcon className="size-3" />
                   </button>
@@ -815,7 +815,7 @@ const SidebarV2Row = memo(function SidebarV2Row(props: {
                   type="button"
                   aria-label="Un-settle thread"
                   onClick={handleUnsettleClick}
-                  className="absolute inset-y-0 right-0 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-2 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/v2-row:opacity-100"
+                  className="absolute inset-y-0 right-0 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-2 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/v2-row:opacity-100 [@media(hover:none)]:opacity-100"
                 >
                   <Undo2Icon className="size-3" />
                 </button>
@@ -824,7 +824,7 @@ const SidebarV2Row = memo(function SidebarV2Row(props: {
                   type="button"
                   aria-label="Settle thread"
                   onClick={handleSettleClick}
-                  className="absolute inset-y-0 right-0 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-2 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/v2-row:opacity-100"
+                  className="absolute inset-y-0 right-0 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-2 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/v2-row:opacity-100 [@media(hover:none)]:opacity-100"
                 >
                   <CheckIcon className="size-3" />
                 </button>
@@ -882,7 +882,7 @@ const SidebarV2Row = memo(function SidebarV2Row(props: {
               <span className="relative ml-auto flex h-5 min-w-8 shrink-0 items-center justify-end pl-1 text-xs">
                 <span
                   className={cn(
-                    "tabular-nums text-muted-foreground/65 transition-opacity group-hover/v2-row:opacity-0",
+                    "tabular-nums text-muted-foreground/65 transition-opacity group-hover/v2-row:opacity-0 [@media(hover:none)]:opacity-0",
                     snoozeMenuOpen && "opacity-0",
                   )}
                 >
@@ -917,7 +917,7 @@ const SidebarV2Row = memo(function SidebarV2Row(props: {
                 {props.settlementSupported || showSnoozeButton ? (
                   <span
                     className={cn(
-                      "absolute inset-y-0 right-0 flex items-stretch gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/v2-row:opacity-100",
+                      "absolute inset-y-0 right-0 flex items-stretch gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/v2-row:opacity-100 [@media(hover:none)]:opacity-100",
                       snoozeMenuOpen && "opacity-100",
                     )}
                   >
