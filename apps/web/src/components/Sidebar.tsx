@@ -2839,7 +2839,7 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
               <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground/80" />
               <span className="flex-1 truncate text-left text-sm font-medium">Search</span>
               {commandPaletteShortcutLabel ? (
-                <Kbd className="h-4 min-w-0 rounded-sm px-1.5 text-[10px]">
+                <Kbd className="h-4 min-w-0 rounded-sm px-1.5 text-[10px] pointer-coarse:hidden">
                   {commandPaletteShortcutLabel}
                 </Kbd>
               ) : null}
