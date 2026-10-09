@@ -22,6 +22,12 @@ import * as NodeStringDecoder from "node:string_decoder";
 import type { UsageProviderKind } from "@t3tools/contracts";
 
 import { createTranscriptJsonReader } from "../project/AgentSessionJson.ts";
+import {
+  initialCopilotScanState,
+  parseCopilotLine,
+  parseCopilotRecord,
+  type CopilotScanState,
+} from "./copilotUsage.ts";
 
 import {
   initialCodexScanState,
@@ -62,6 +68,7 @@ export interface TranscriptParsePosition {
   readonly guardHash: number;
   /** Codex reducer state as of `resumeOffset`; `null` for stateless providers. */
   readonly codexState: CodexScanState | null;
+  readonly copilotState?: CopilotScanState;
 }
 
 export interface TranscriptParseResult {
@@ -93,7 +100,12 @@ type SelectedFields = { readonly [key: string]: true | SelectedFields };
 
 // Keep the fields consumed by usageTranscripts, including reducer state and
 // dedupe/cost metadata. A selected subtree (usage) keeps future token fields.
-const USAGE_FIELDS: Record<"claude" | "codex" | "grok", SelectedFields> = {
+const USAGE_FIELDS: Record<"claude" | "codex" | "grok" | "copilot", SelectedFields> = {
+  copilot: {
+    type: true,
+    timestamp: true,
+    data: { sessionId: true, modelMetrics: true },
+  },
   claude: {
     type: true,
     timestamp: true,
@@ -127,7 +139,10 @@ const USAGE_FIELDS: Record<"claude" | "codex" | "grok", SelectedFields> = {
 };
 
 function selectUsageFields(provider: UsageProviderKind) {
-  const fields = USAGE_FIELDS[provider === "codex" || provider === "grok" ? provider : "claude"];
+  const fields =
+    USAGE_FIELDS[
+      provider === "codex" || provider === "grok" || provider === "copilot" ? provider : "claude"
+    ];
   return (path: ReadonlyArray<string | number | null>): boolean => {
     let selected: true | SelectedFields = fields;
     for (const key of path) {
@@ -278,20 +293,32 @@ export async function readTranscriptRecords(
 
   try {
     let codexState = initialCodexScanState();
+    let copilotState = initialCopilotScanState(NodePath.basename(NodePath.dirname(filePath)));
     let resumed = false;
     let start = 0;
     if (
       resumeFrom !== undefined &&
       resumeFrom.resumeOffset > 0 &&
       (provider !== "codex" || resumeFrom.codexState !== null) &&
+      (provider !== "copilot" || resumeFrom.copilotState !== undefined) &&
       (await guardMatches(handle, resumeFrom))
     ) {
       if (resumeFrom.codexState !== null) codexState = { ...resumeFrom.codexState };
+      if (resumeFrom.copilotState !== undefined) copilotState = { ...resumeFrom.copilotState };
       start = resumeFrom.resumeOffset;
       resumed = true;
     }
 
-    const parseLine = (line: string, state: CodexScanState, out: UsageRecord[]): void => {
+    const parseLine = (
+      line: string,
+      state: CodexScanState,
+      out: UsageRecord[],
+      copilot = copilotState,
+    ): void => {
+      if (provider === "copilot") {
+        if (mightCarryUsage(line, provider)) out.push(...parseCopilotLine(line, copilot));
+        return;
+      }
       if (provider === "codex") {
         if (
           !mightCarryUsage(line, provider) &&
@@ -350,11 +377,13 @@ export async function readTranscriptRecords(
       }
       streaming.write(decoder!.write(segment));
     };
-    const finish = (state: CodexScanState, out: UsageRecord[]) => {
+    const finish = (state: CodexScanState, out: UsageRecord[], copilot = copilotState) => {
       if (streaming) {
         streaming.write(decoder!.end());
         const projected = streaming.finish();
-        if (provider === "grok") {
+        if (provider === "copilot") {
+          out.push(...parseCopilotRecord(projected, copilot));
+        } else if (provider === "grok") {
           out.push(...parseGrokRecord(projected));
         } else {
           const record =
@@ -368,7 +397,7 @@ export async function readTranscriptRecords(
           pendingChunks.length === 1
             ? pendingChunks[0]!
             : Buffer.concat(pendingChunks, pendingBytes);
-        parseLine(toLineString(line), state, out);
+        parseLine(toLineString(line), state, out, copilot);
       }
       pendingChunks = [];
       pendingBytes = 0;
@@ -403,7 +432,7 @@ export async function readTranscriptRecords(
     }
 
     const tailRecords: UsageRecord[] = [];
-    finish({ ...codexState }, tailRecords);
+    finish({ ...codexState }, tailRecords, { ...copilotState });
 
     const guardLength = Math.min(GUARD_LENGTH, resumeOffset);
     let guardHash = 0;
@@ -421,6 +450,7 @@ export async function readTranscriptRecords(
         guardLength,
         guardHash,
         codexState: provider === "codex" ? codexState : null,
+        ...(provider === "copilot" ? { copilotState } : {}),
       },
       resumed,
     };

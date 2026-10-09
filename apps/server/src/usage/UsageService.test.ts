@@ -233,6 +233,71 @@ function cursorSource(summary: { readonly sources: readonly UsageSource[] }) {
 }
 
 describe("UsageService", () => {
+  it.live(
+    "reads Copilot CLI homes once, resumes after restart, and merges environments without duplicates",
+    () =>
+      Effect.gen(function* () {
+        const { home, settings } = yield* setup;
+        const copilotHome = NodePath.join(home, "copilot-custom");
+        const events = NodePath.join(copilotHome, "session-state", "session", "events.jsonl");
+        const snapshot = (inputTokens: number, outputTokens: number, day: string) =>
+          JSON.stringify({
+            type: "session.shutdown",
+            timestamp: `2026-08-${day}T10:00:00Z`,
+            data: { modelMetrics: { "gpt-5.4": { usage: { inputTokens, outputTokens } } } },
+          }) + "\n";
+        yield* Effect.promise(async () => {
+          await NodeFSP.mkdir(NodePath.dirname(events), { recursive: true });
+          await NodeFSP.writeFile(events, snapshot(100, 50, "01"));
+        });
+        const layer = layerService({
+          prefix: "usage-copilot",
+          home,
+          environment: { COPILOT_HOME: copilotHome },
+          settings: {
+            ...settings,
+            providerInstances: {
+              ...settings.providerInstances,
+              [ProviderInstanceId.make("copilot-extra")]: {
+                driver: ProviderDriverKind.make("acpRegistry"),
+                enabled: false,
+                config: {
+                  agentId: "github-copilot-cli",
+                  commandArgs: ["--config-dir", copilotHome],
+                },
+              },
+            },
+          },
+        });
+        const read = Effect.gen(function* () {
+          const service = yield* UsageService.make;
+          return yield* service.readSummary(WINDOW);
+        }).pipe(Effect.scoped, Effect.provide(layer));
+        const first = yield* read;
+        const sources = first.sources.filter((source) => source.fingerprint.provider === "copilot");
+        assert.strictEqual(sources.length, 1);
+        assert.strictEqual(sources[0]?.status, "partial");
+        assert.strictEqual(
+          first.buckets.find((bucket) => bucket.provider === "copilot")?.totals.outputTokens,
+          50,
+        );
+        yield* Effect.promise(() => NodeFSP.appendFile(events, snapshot(160, 80, "02")));
+        const second = yield* read;
+        const output = second.buckets
+          .filter((bucket) => bucket.provider === "copilot")
+          .reduce((sum, bucket) => sum + bucket.totals.outputTokens, 0);
+        assert.strictEqual(output, 80);
+        const merged = mergeUsage(
+          [
+            { environmentId: EnvironmentId.make("copilot-a"), label: "A", summary: second },
+            { environmentId: EnvironmentId.make("copilot-b"), label: "B", summary: second },
+          ],
+          second.contractVersion,
+        );
+        assert.strictEqual(merged.outputTokens, 80);
+      }).pipe(Effect.scoped),
+  );
+
   it.live("reads shared managed default and disabled extra account history once", () =>
     Effect.gen(function* () {
       const { home, settings } = yield* setup;

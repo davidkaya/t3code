@@ -59,6 +59,7 @@ import * as ServerSettings from "../serverSettings.ts";
 import { resolveCodexHomeLayout } from "../provider/Drivers/CodexHomeLayout.ts";
 import { resolveAntigravityInstanceDirectories } from "../provider/antigravityAuthSupport.ts";
 import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
+import { AcpRegistrySettings } from "@t3tools/provider-acp-registry/settings";
 import { readOpenCodeUsage } from "./opencodeUsageReader.ts";
 import { makeAntigravityUsageCache, readAntigravityUsage } from "./antigravityUsageReader.ts";
 import {
@@ -115,12 +116,15 @@ const MAX_HOURLY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const CACHE_RETENTION_DAYS = 92;
 
 const CURSOR_ACCOUNT_READ_ERROR = "Cursor account usage could not be read.";
+const COPILOT_COVERAGE_MESSAGE =
+  "Copilot CLI shutdown snapshots only. Active sessions and sessions without token metrics are missing; usage is dated at shutdown. Costs are API-equivalent estimates, not Copilot credits or subscription charges.";
 
 /** Transcripts parsed at once. More gains little once the disk stays busy. */
 const TRANSCRIPT_READ_CONCURRENCY = 4;
 
 const decodeCodexSettings = Schema.decodeOption(CodexSettings);
 const decodeClaudeSettings = Schema.decodeOption(ClaudeSettings);
+const decodeAcpRegistrySettings = Schema.decodeOption(AcpRegistrySettings);
 
 /** On-disk shape of the rate snapshot. */
 const RatesCacheFile = Schema.Struct({
@@ -350,13 +354,23 @@ export const make = Effect.gen(function* () {
       fileName?: string;
     }> = [];
     const seen = new Set<string>();
-    for (const driver of ["claudeAgent", "codex", "grok"] as const) {
+    for (const driver of ["claudeAgent", "codex", "grok", "copilot"] as const) {
       // Disabled accounts still have history. An unconfigured default slot
       // runs with default config, just as it does in the provider registry.
       const instances: Array<
         Pick<ProviderInstanceConfig, "config" | "environment"> & { instanceId: ProviderInstanceId }
       > = Object.entries(settings.providerInstances)
-        .filter(([, instance]) => instance.driver === driver)
+        .filter(([, instance]) => {
+          if (driver !== "copilot") return instance.driver === driver;
+          if (instance.driver !== "acpRegistry") return false;
+          const decoded = decodeAcpRegistrySettings(instance.config ?? {});
+          return (
+            Option.isSome(decoded) &&
+            (decoded.value.agentId === "github-copilot-cli" ||
+              (decoded.value.source === "local" &&
+                /^copilot(?:\.exe|\.cmd)?$/i.test(path.basename(decoded.value.commandPath))))
+          );
+        })
         .map(([id, instance]) => ({ ...instance, instanceId: ProviderInstanceId.make(id) }));
       if (!Object.hasOwn(settings.providerInstances, driver)) {
         instances.push({ instanceId: ProviderInstanceId.make(driver) });
@@ -386,12 +400,36 @@ export const make = Effect.gen(function* () {
           home = configured
             ? expandHomePath(configured)
             : environment.CLAUDE_CONFIG_DIR?.trim() || path.join(NodeOS.homedir(), ".claude");
+        } else if (driver === "copilot") {
+          const decoded = decodeAcpRegistrySettings(instance.config ?? {});
+          const args = Option.isSome(decoded) ? decoded.value.commandArgs : [];
+          let configured: string | undefined;
+          for (const [index, arg] of args.entries()) {
+            if (arg === "--config-dir") configured = args[index + 1];
+            else if (arg.startsWith("--config-dir="))
+              configured = arg.slice("--config-dir=".length);
+          }
+          home = expandHomePath(
+            configured?.trim() ||
+              environment.COPILOT_HOME?.trim() ||
+              path.join(
+                environment.HOME || environment.USERPROFILE || NodeOS.homedir(),
+                ".copilot",
+              ),
+          );
         } else {
           home = expandHomePath(
             environment.GROK_HOME?.trim() || path.join(NodeOS.homedir(), ".grok"),
           );
         }
-        const directory = path.resolve(home, provider === "claude" ? "projects" : "sessions");
+        const directory = path.resolve(
+          home,
+          provider === "claude"
+            ? "projects"
+            : provider === "copilot"
+              ? "session-state"
+              : "sessions",
+        );
         const sourceKey = provider + "\0" + directory;
         const previous = sourceCache.get(sourceKey);
         // Keep canonical paths and source fingerprints stable after root cleanup,
@@ -426,6 +464,7 @@ export const make = Effect.gen(function* () {
           dir,
           volumeId,
           ...(provider === "grok" ? { fileName: "updates.jsonl" } : {}),
+          ...(provider === "copilot" ? { fileName: "events.jsonl" } : {}),
         });
       }
     }
@@ -623,7 +662,16 @@ export const make = Effect.gen(function* () {
     const exists = yield* fileSystem
       .exists(dir)
       .pipe(Effect.catchCause(() => Effect.succeed(false)));
-    if (!exists) return { provider, dir, volumeId, files: null } satisfies ScannedDir;
+    if (!exists)
+      return {
+        provider,
+        dir,
+        volumeId,
+        files: null,
+        ...(provider === "copilot"
+          ? { status: "partial" as const, message: COPILOT_COVERAGE_MESSAGE }
+          : {}),
+      } satisfies ScannedDir;
     const files = yield* Effect.promise(() =>
       listTranscriptFiles(dir, windowStartMs, fileName === undefined ? undefined : { fileName }),
     );
@@ -653,7 +701,18 @@ export const make = Effect.gen(function* () {
       }
       return { path, records };
     });
-    return { provider, dir, volumeId, files: parsedFiles } satisfies ScannedDir;
+    return {
+      provider,
+      dir,
+      volumeId,
+      files: parsedFiles,
+      ...(provider === "copilot"
+        ? {
+            status: "partial" as const,
+            message: COPILOT_COVERAGE_MESSAGE,
+          }
+        : {}),
+    } satisfies ScannedDir;
   });
 
   /** Fetches what one account cache is missing, then persists it if anything changed. */

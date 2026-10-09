@@ -15,9 +15,14 @@
  * @module usageScanCache
  */
 import type { UsageProviderKind } from "@t3tools/contracts";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
+import { CopilotScanState } from "./copilotUsage.ts";
 import { GUARD_LENGTH, type TranscriptParsePosition } from "./usageTranscriptReader.ts";
 import type { CodexScanState, UsageRecord, UsageSpeed } from "./usageTranscripts.ts";
+
+const decodeCopilotState = Schema.decodeUnknownOption(CopilotScanState);
 
 // v2: Codex fork-copy suppression changed what a file parses to, so v1
 // entries would keep serving double-counted records forever.
@@ -94,6 +99,7 @@ interface SerializedFile {
   readonly gh: number;
   /** Codex reducer state at `o`; `null` for stateless providers. */
   readonly cs: CodexScanState | null;
+  readonly cps?: CopilotScanState;
 }
 
 interface SerializedCache {
@@ -148,6 +154,7 @@ function serializeFile(entry: CachedFile, tables: InternTables): SerializedFile 
     gl: entry.position.guardLength,
     gh: entry.position.guardHash,
     cs: entry.position.codexState,
+    ...(entry.position.copilotState ? { cps: entry.position.copilotState } : {}),
   };
 }
 
@@ -300,7 +307,8 @@ export function decodeScanCache(document: unknown): ScanCache {
     if (typeof raw !== "object" || raw === null) continue;
     const entry = raw as Partial<SerializedFile>;
     if (typeof entry.s !== "number" || typeof entry.m !== "number") continue;
-    if (entry.p !== "claude" && entry.p !== "codex" && entry.p !== "grok") continue;
+    if (entry.p !== "claude" && entry.p !== "codex" && entry.p !== "grok" && entry.p !== "copilot")
+      continue;
     if (!isRecordArray(entry.r) || !isRecordArray(entry.t)) continue;
     // Position fields feed byte offsets and a Buffer allocation in the reader,
     // so anything outside their real ranges must reject the entry: a bogus
@@ -326,6 +334,8 @@ export function decodeScanCache(document: unknown): ScanCache {
     const legacyCodex = entry.p === "codex" && version < USAGE_SCAN_CACHE_VERSION;
     const codexState = legacyCodex ? null : decodeCodexState(entry.cs);
     if (codexState === undefined) continue;
+    const copilotState = entry.p === "copilot" ? decodeCopilotState(entry.cps) : Option.none();
+    if (entry.p === "copilot" && Option.isNone(copilotState)) continue;
 
     const provider: UsageProviderKind = entry.p;
     const records = decodeRecords(entry.r, provider);
@@ -340,7 +350,13 @@ export function decodeScanCache(document: unknown): ScanCache {
       tailRecords,
       position: legacyCodex
         ? { resumeOffset: 0, guardLength: 0, guardHash: 0, codexState: null }
-        : { resumeOffset: entry.o, guardLength: entry.gl, guardHash: entry.gh, codexState },
+        : {
+            resumeOffset: entry.o,
+            guardLength: entry.gl,
+            guardHash: entry.gh,
+            codexState,
+            ...(Option.isSome(copilotState) ? { copilotState: copilotState.value } : {}),
+          },
     });
   }
 

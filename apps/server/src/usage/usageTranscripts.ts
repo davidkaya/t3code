@@ -74,6 +74,8 @@ export function totalTokens(totals: UsageTokenTotals): number {
 export function mightCarryUsage(line: string, provider: UsageProviderKind): boolean {
   if (provider === "claude") return line.includes('"usage"');
   if (provider === "grok") return line.includes('"turn_completed"');
+  if (provider === "copilot")
+    return line.includes('"session.shutdown"') || line.includes('"session.start"');
   return line.includes('"token_count"');
 }
 

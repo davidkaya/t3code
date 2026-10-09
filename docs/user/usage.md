@@ -6,7 +6,7 @@ desktop when the terminal is not focused. Customize `usage.open` in
 
 ## Understand your usage
 
-**Usage** combines Codex, Claude Code, Grok Build, OpenCode, Antigravity, and Cursor history from your connected
+**Usage** combines Codex, Claude Code, Grok Build, OpenCode, Antigravity, GitHub Copilot, and Cursor history from your connected
 environments. It shows token use, cache savings, model breakdowns, and estimated API-equivalent
 cost, split by token type and by speed. These estimates are not your subscription bill.
 **Premium** is what Fast and Ultrafast requests cost above standard rates. Cost that cannot be
@@ -15,6 +15,14 @@ Select a model under **Breakdown** to see its trend, cache hit rate, and cost pe
 
 Totals depend on the history available on each server. Grok turns without a saved completed-turn
 record are missing from the totals.
+
+GitHub Copilot reads Copilot CLI's saved per-model shutdown snapshots, including CLI sessions
+run through ACP. Active sessions and sessions without token metrics are not included. Usage
+is dated at shutdown; resumed sessions contribute only the increase since the previous snapshot.
+These are API-equivalent cost estimates, not Copilot credits or premium-request allowances.
+The separate Copilot Language Server ACP agent does not provide this CLI history.
+Custom CLI homes follow `COPILOT_HOME` or `--config-dir` in the ACP provider's executable
+arguments. Refresh after the CLI session shuts down to include its saved usage.
 
 OpenCode reads its SQLite database and older JSON history. Antigravity reads local conversation
 databases, including T3-managed profiles. Set `OPENCODE_DATA_DIR` or `ANTIGRAVITY_DATA_DIR` on the
