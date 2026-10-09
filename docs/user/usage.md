@@ -120,6 +120,14 @@ Grok reports the remaining subscription allowance and reset time for its current
 after signing in with `grok login`. Explicit `XAI_API_KEY` connections and custom authentication
 or endpoint configurations do not report subscription limits.
 
+Copilot CLI ACP instances report finite monthly account allowances under **Usage → Limits**,
+including premium requests when available. Sign in to the CLI on the server, then refresh Limits.
+T3 reads GitHub's account quota report without starting a conversation or spending requests.
+Unlimited allowances do not appear as percentage bars. The allowance is not an estimated token
+cost, and reaching it may still allow paid overage depending on your GitHub billing settings.
+The separate Copilot Language Server ACP agent does not report these CLI quotas. Custom command
+arguments other than `--acp`, `--config-dir`, or `--auth-token-env` disable quota probing.
+
 API-key accounts may not report subscription limits. This also applies to Claude connections
 using a proxy through `ANTHROPIC_AUTH_TOKEN`.
 

@@ -79,6 +79,22 @@ describe("applyUsageLimitsUpdate", () => {
 });
 
 describe("resolveUsageLimitsAfterProbe", () => {
+  it("does not retain quotas after the authenticated account changes", () => {
+    const previous = { ...published, credentialFingerprint: "previous-account" };
+    const failure = {
+      checkedAt,
+      windows: [],
+      credentialFingerprint: "new-account",
+      unavailable: { reason: "probeFailed" as const },
+    };
+    expect(resolveUsageLimitsAfterProbe({ published: previous, probed: failure })).toBe(failure);
+    expect(
+      resolveUsageLimitsAfterProbe({
+        published: previous,
+        probed: { ...failure, credentialFingerprint: "previous-account" },
+      }),
+    ).toBe(previous);
+  });
   it("keeps the last good windows through a failed probe but not an unsupported one", () => {
     const failed = { checkedAt, windows: [], unavailable: { reason: "probeFailed" as const } };
     const unsupported = { checkedAt, windows: [], unavailable: { reason: "unsupported" as const } };

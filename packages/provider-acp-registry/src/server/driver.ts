@@ -56,6 +56,7 @@ import * as AcpRegistrySupport from "./AcpRegistrySupport.ts";
 import * as AcpRegistryRuntimeCoordinator from "./AcpRegistryRuntimeCoordinator.ts";
 import * as AcpRegistryAuth from "./auth.ts";
 import * as AcpRegistryAuthenticationState from "./authenticationState.ts";
+import * as CopilotUsageLimits from "./copilotUsageLimits.ts";
 
 const DRIVER_KIND = ProviderDriverKind.make("acpRegistry");
 const decodeSettings = Schema.decodeSync(AcpRegistrySettings);
@@ -498,6 +499,9 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       };
       const effectiveConfig = { ...config, enabled } satisfies AcpRegistrySettings;
       const processEnvironment = mergeProviderInstanceEnvironment(environment, hostEnvironment);
+      const copilotLimits = CopilotUsageLimits.isCopilotCli(effectiveConfig)
+        ? yield* CopilotUsageLimits.make
+        : undefined;
       const orchestrationAdapter = yield* AcpRegistryAdapterV2Driver.create({
         instanceId,
         displayName,
@@ -564,6 +568,17 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       const checkProvider = checkAcpRegistryProviderReadiness(readinessInput).pipe(
         Effect.provideService(AcpRegistrySupport.AcpRegistryCatalog, catalog),
         Effect.flatMap(withLiveRuntimeState),
+        Effect.flatMap((provider) =>
+          copilotLimits && provider.installed && provider.enabled
+            ? copilotLimits
+                .read({
+                  settings: effectiveConfig,
+                  cwd: host.paths.cwd,
+                  environment: processEnvironment,
+                })
+                .pipe(Effect.map((usageLimits) => ({ ...provider, usageLimits })))
+            : Effect.succeed(provider),
+        ),
       );
       const enrichProvider = checkAcpRegistryProviderStatus(
         {

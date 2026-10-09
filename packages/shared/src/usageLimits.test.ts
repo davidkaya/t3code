@@ -147,6 +147,60 @@ describe("pools", () => {
   };
   const laptop = { entry: { target: { label: "Laptop" } } };
 
+  it("deduplicates Copilot allowances by account across environments, not by instance name", () => {
+    const copilot = provider({
+      driver: ProviderDriverKind.make("acpRegistry"),
+      instanceId: ProviderInstanceId.make("copilot-local"),
+      displayName: "Copilot CLI",
+      auth: { status: "unknown" },
+      usageLimits: {
+        checkedAt,
+        credentialFingerprint: "copilot-account",
+        windows: [
+          {
+            id: "copilot_premium_interactions",
+            kind: "monthly",
+            label: "Copilot premium requests",
+            usedPercent: 25,
+          },
+        ],
+      },
+    });
+    const accounts = collectLimitAccounts(
+      new Map([
+        [EnvironmentId.make("env-a"), { ...laptop, serverConfig: { providers: [copilot] } }],
+        [
+          EnvironmentId.make("env-b"),
+          {
+            entry: { target: { label: "Remote" } },
+            serverConfig: {
+              providers: [
+                {
+                  ...copilot,
+                  instanceId: ProviderInstanceId.make("copilot-remote"),
+                  usageLimits: {
+                    ...copilot.usageLimits!,
+                    checkedAt: "2026-09-03T11:30:00.000Z",
+                    windows: [{ ...copilot.usageLimits!.windows[0]!, usedPercent: 50 }],
+                  },
+                },
+                {
+                  ...copilot,
+                  instanceId: ProviderInstanceId.make("other-copilot-account"),
+                  usageLimits: { ...copilot.usageLimits!, credentialFingerprint: "other-account" },
+                },
+              ],
+            },
+          },
+        ],
+      ]),
+    );
+    expect(accounts).toHaveLength(2);
+    expect(accounts[0]?.environments).toHaveLength(2);
+    expect(accounts[0]?.limits.windows[0]?.usedPercent).toBe(50);
+    expect(accounts[1]?.environments).toHaveLength(1);
+  });
+
   it("merges one account reported natively on two environments and by a hub into one entry", () => {
     const native = provider({
       driver: claude,

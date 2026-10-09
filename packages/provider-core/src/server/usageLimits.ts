@@ -111,8 +111,8 @@ function usageWindowEquals(a: ServerProviderUsageWindow, b: ServerProviderUsageW
 /**
  * Choose what to publish after a status probe finishes. A probe that failed
  * this time must not wipe bars a previous probe or a turn already
- * established, so the last good snapshot stays; `unsupported` is
- * authoritative and replaces them.
+ * established, so the last good snapshot stays unless the account identity
+ * changed; `unsupported` is authoritative and replaces them.
  *
  * A successful probe replaces the published windows outright, including any
  * runtime update that landed while it was running. That is a deliberate
@@ -127,7 +127,13 @@ export function resolveUsageLimitsAfterProbe(input: {
   readonly probed: ServerProviderUsageLimits | undefined;
 }): ServerProviderUsageLimits | undefined {
   const { published, probed } = input;
-  if (probed?.unavailable?.reason === "probeFailed" && published && !published.unavailable) {
+  if (
+    probed?.unavailable?.reason === "probeFailed" &&
+    published &&
+    !published.unavailable &&
+    (probed.credentialFingerprint === undefined ||
+      probed.credentialFingerprint === published.credentialFingerprint)
+  ) {
     return published;
   }
   return probed;
